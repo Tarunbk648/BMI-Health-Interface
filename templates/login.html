@@ -3,64 +3,130 @@
 {% block title %}Login - BMI Health Tracker{% endblock %}
 
 {% block content %}
-<div class="auth-container">
-    <div class="medical-slider">
-        <div class="medical-slider-content">
-            <div class="medical-visual">
-                <div class="visual-heart">❤️</div>
+<div class="medical-login-wrapper">
+    <div class="left-section">
+        <div class="brand-section">
+            <div class="brand-logo-large">🏥</div>
+            <h2>BMI Health Tracker</h2>
+            <p>Your Personal Health Companion</p>
+        </div>
+        
+        <div class="benefits-section">
+            <div class="benefit-item">
+                <div class="benefit-icon">📊</div>
+                <div class="benefit-text">
+                    <h4>Track Your Health</h4>
+                    <p>Monitor BMI and health metrics</p>
+                </div>
             </div>
-            <div class="medical-visual">
-                <div class="visual-chart"></div>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">💡</div>
+                <div class="benefit-text">
+                    <h4>Smart Insights</h4>
+                    <p>Get personalized health advice</p>
+                </div>
             </div>
-            <div class="medical-visual">
-                <div class="visual-fitness">💪</div>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">🔒</div>
+                <div class="benefit-text">
+                    <h4>Secure & Private</h4>
+                    <p>Medical-grade data protection</p>
+                </div>
             </div>
-            <div class="medical-visual">
-                <div class="visual-scale">⚖️</div>
+            
+            <div class="benefit-item">
+                <div class="benefit-icon">📈</div>
+                <div class="benefit-text">
+                    <h4>Progress Reports</h4>
+                    <p>Detailed health analytics</p>
+                </div>
             </div>
+        </div>
+        
+        <div class="testimonial-section">
+            <p>"Transformed my health journey with real insights!"</p>
+            <span>- Sarah M., Health Conscious User</span>
+        </div>
+        
+        <div class="animated-medical-bg">
+            <div class="floating-icon icon-1">❤️</div>
+            <div class="floating-icon icon-2">💊</div>
+            <div class="floating-icon icon-3">🏃</div>
+            <div class="floating-icon icon-4">⚖️</div>
         </div>
     </div>
     
-    <div class="auth-card">
-        <div class="auth-header">
-            <h1>Welcome</h1>
-            <p>Login to access your BMI tracking dashboard</p>
+    <div class="right-section">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>Welcome Back</h1>
+                <p>Sign in to your health dashboard</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group-modern">
+                    <div class="input-wrapper">
+                        <span class="input-icon">✉️</span>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            placeholder="Email Address"
+                            class="form-input-modern"
+                        >
+                    </div>
+                </div>
+                
+                <div class="form-group-modern">
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔐</span>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            placeholder="Password"
+                            class="form-input-modern"
+                        >
+                    </div>
+                </div>
+                
+                <div id="errorMessages" class="error-messages-modern"></div>
+                
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+                
+                <button type="submit" class="btn-login-modern">
+                    <span class="btn-text">Sign In</span>
+                    <span class="btn-icon">→</span>
+                </button>
+            </form>
+            
+            <div class="divider-modern">
+                <span>New to BMI Health?</span>
+            </div>
+            
+            <a href="{{ url_for('register') }}" class="btn-register">
+                Create Account
+            </a>
+            
+            <div class="security-badges">
+                <div class="badge">🔒 Secure</div>
+                <div class="badge">✓ Verified</div>
+                <div class="badge">⭐ Trusted</div>
+            </div>
         </div>
         
-        <form id="loginForm" class="auth-form">
-            <div class="form-group">
-                <label for="email">Email Address</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
-                    required 
-                    placeholder="Enter your email"
-                    class="form-input"
-                >
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    required 
-                    placeholder="Enter your password"
-                    class="form-input"
-                >
-            </div>
-            
-            <div id="errorMessages" class="error-messages"></div>
-            
-            <button type="submit" class="btn btn-primary btn-block">
-                Login
-            </button>
-        </form>
-        
-        <div class="auth-footer">
-            <p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
+        <div class="login-footer">
+            <p>Need help? <a href="#">Contact Support</a> | <a href="#">Privacy Policy</a></p>
         </div>
     </div>
 </div>
@@ -74,8 +140,12 @@
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
         const errorDiv = document.getElementById('errorMessages');
+        const btn = e.target.querySelector('.btn-login-modern');
         
         errorDiv.innerHTML = '';
+        
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
         
         try {
             const response = await fetch('{{ url_for("login") }}', {
@@ -94,12 +164,16 @@
             if (data.success) {
                 window.location.href = '{{ url_for("dashboard") }}';
             } else {
-                errorDiv.className = 'error-messages';
+                errorDiv.className = 'error-messages-modern';
                 errorDiv.innerHTML = data.errors.map(err => `<p>❌ ${err}</p>`).join('');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="btn-text">Sign In</span><span class="btn-icon">→</span>';
             }
         } catch (error) {
-            errorDiv.className = 'error-messages';
+            errorDiv.className = 'error-messages-modern';
             errorDiv.innerHTML = '<p>❌ An error occurred. Please try again.</p>';
+            btn.disabled = false;
+            btn.innerHTML = '<span class="btn-text">Sign In</span><span class="btn-icon">→</span>';
         }
     });
 </script>
