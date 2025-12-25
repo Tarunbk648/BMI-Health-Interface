@@ -988,5 +988,6 @@ def logout():
 
 if __name__ == '__main__':
     init_db()
-    # Using 0.0.0.0 makes the server accessible from other devices on the same Wi-Fi
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
