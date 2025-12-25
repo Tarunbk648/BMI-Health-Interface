@@ -18,6 +18,10 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
 import io
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -102,6 +106,18 @@ def init_db():
             due_date TIMESTAMP,
             FOREIGN KEY (patient_id) REFERENCES users(id),
             FOREIGN KEY (record_id) REFERENCES bmi_records(id)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
     
@@ -514,15 +530,14 @@ def generate_invoice_pdf(patient_name, patient_id, invoice_number, height, weigh
     return pdf_path
 
 def send_email(recipient_email, patient_name, pdf_path):
-    sender_email = os.getenv('GMAIL_EMAIL', "your_email@gmail.com")
+    sender_email = os.getenv('GMAIL_SENDER_EMAIL', "your_email@gmail.com")
     sender_password = os.getenv('GMAIL_APP_PASSWORD', "your_app_password")
     
     if sender_email == "your_email@gmail.com" or sender_password == "your_app_password":
         print("❌ Email credentials not configured.")
-        print("📧 To enable email, set these environment variables:")
-        print("   1. GMAIL_EMAIL = your_gmail_address@gmail.com")
-        print("   2. GMAIL_APP_PASSWORD = your_16_character_app_password")
-        print("\nOr edit app.py lines 457-458 directly with your credentials.")
+        print("📧 To enable email, create a .env file with:")
+        print("   GMAIL_SENDER_EMAIL=your_gmail_address@gmail.com")
+        print("   GMAIL_APP_PASSWORD=your_16_character_app_password")
         return False
     
     try:
@@ -641,6 +656,8 @@ def login():
         return jsonify({'success': False, 'errors': ['Invalid email or password']}), 401
     
     return render_template('login.html')
+
+
 
 @app.route('/dashboard')
 @login_required
