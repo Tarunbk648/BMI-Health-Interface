@@ -533,14 +533,14 @@ def generate_invoice_pdf(patient_name, patient_id, invoice_number, height, weigh
     return pdf_path
 
 def send_email(recipient_email, patient_name, pdf_path):
-    sender_email = os.getenv('GMAIL_SENDER_EMAIL', "your_email@gmail.com")
-    sender_password = os.getenv('GMAIL_APP_PASSWORD', "your_app_password")
+    sender_email = os.getenv('GMAIL_EMAIL', "your_email@gmail.com")
+    sender_password = os.getenv('GMAIL_PASSWORD', "your_app_password")
     
     if sender_email == "your_email@gmail.com" or sender_password == "your_app_password":
         print("❌ Email credentials not configured.")
         print("📧 To enable email, create a .env file with:")
-        print("   GMAIL_SENDER_EMAIL=your_gmail_address@gmail.com")
-        print("   GMAIL_APP_PASSWORD=your_16_character_app_password")
+        print("   GMAIL_EMAIL=your_gmail_address@gmail.com")
+        print("   GMAIL_PASSWORD=your_16_character_app_password")
         return False
     
     try:
