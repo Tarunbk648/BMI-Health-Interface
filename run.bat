@@ -27,7 +27,13 @@ if errorlevel 1 (
 echo.
 echo Starting Flask development server...
 echo.
-echo Server will run at: http://127.0.0.1:5000
+echo Server will run at:
+echo 1. Local: http://127.0.0.1:5000
+echo 2. Mobile: http://[YOUR-COMPUTER-IP]:5000
+echo.
+echo To find your computer's IP: Open Command Prompt and type 'ipconfig'
+echo Look for IPv4 Address (usually starts with 192.168.x.x)
+echo.
 echo Press Ctrl+C to stop the server
 echo.
 python app.py
