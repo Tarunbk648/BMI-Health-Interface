@@ -58,8 +58,8 @@
             <p id="invoiceInfo" style="margin: 10px 0;"></p>
             
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button id="sendInvoiceEmailBtn" class="btn btn-info" style="flex: 1;">
-                    📧 Send Invoice to My Email
+                <button id="downloadInvoiceBtn" class="btn btn-info" style="flex: 1;">
+                    📥 Download Invoice (PDF)
                 </button>
             </div>
             
@@ -222,43 +222,15 @@
         }
     });
     
-    document.getElementById('sendInvoiceEmailBtn').addEventListener('click', async () => {
-        const messageDiv = document.getElementById('messageDiv');
-        const btn = document.getElementById('sendInvoiceEmailBtn');
-        
-        btn.disabled = true;
-        btn.textContent = '📧 Sending Invoice...';
-        messageDiv.innerHTML = '';
-        
-        try {
-            if (!currentInvoiceId) {
-                throw new Error('Invoice not found. Please create it first.');
-            }
-            
-            const response = await fetch(`/send-invoice/${currentInvoiceId}`, { 
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await response.json();
-            
-            if (data.success) {
-                messageDiv.className = 'success-messages';
-                messageDiv.innerHTML = `<p>✅ Invoice sent successfully to your email!</p>`;
-                btn.textContent = '✅ Sent!';
-            } else {
-                messageDiv.className = 'error-messages';
-                messageDiv.innerHTML = `<p>❌ Error: ${data.error}</p>`;
-                btn.disabled = false;
-                btn.textContent = '📧 Send Invoice to My Email';
-            }
-        } catch (error) {
+    document.getElementById('downloadInvoiceBtn').addEventListener('click', () => {
+        if (!currentInvoiceId) {
+            const messageDiv = document.getElementById('messageDiv');
             messageDiv.className = 'error-messages';
-            messageDiv.innerHTML = `<p>❌ Error: ${error.message || 'Failed to send email'}</p>`;
-            btn.disabled = false;
-            btn.textContent = '📧 Send Invoice to My Email';
+            messageDiv.innerHTML = `<p>❌ Invoice not found. Please create it first.</p>`;
+            return;
         }
+        
+        window.location.href = `/download-invoice/${currentInvoiceId}`;
     });
 </script>
 {% endblock %}

@@ -235,300 +235,156 @@ def generate_invoice_pdf(patient_name, patient_id, invoice_number, height, weigh
     if not os.path.exists('temp_pdfs'):
         os.makedirs('temp_pdfs')
     
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.6*inch, leftMargin=0.6*inch, rightMargin=0.6*inch)
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
     story = []
     styles = getSampleStyleSheet()
     
-    rx_symbol_style = ParagraphStyle(
-        'RxSymbol',
-        parent=styles['Heading1'],
-        fontSize=36,
-        textColor=colors.HexColor('#1a5490'),
-        spaceAfter=0,
-        alignment=0,
-        fontName='Helvetica-Bold'
-    )
+    # Modern UI Colors from Dashboard
+    dark_blue = colors.HexColor('#1a5490')
+    section_bg = colors.HexColor('#4a8fc4')
+    total_bg = colors.HexColor('#e3f2fd')
+    total_red = colors.HexColor('#e74c3c')
+    light_yellow_bg = colors.HexColor('#fef9e7')
+    border_orange = colors.HexColor('#f39c12')
     
-    clinic_header_style = ParagraphStyle(
-        'ClinicHeader',
-        parent=styles['Normal'],
-        fontSize=16,
-        textColor=colors.HexColor('#1a5490'),
-        spaceAfter=2,
-        fontName='Helvetica-Bold',
-        alignment=0
-    )
+    # Category Colors
+    bmi_colors = {
+        'Underweight': colors.HexColor('#3498db'),
+        'Normal': colors.HexColor('#2ecc71'),
+        'Overweight': colors.HexColor('#d98d1a'),
+        'Obese': colors.HexColor('#e74c3c')
+    }
+    bmi_color = bmi_colors.get(category, dark_blue)
+
+    # Styles
+    title_style = ParagraphStyle('TitleStyle', fontSize=18, textColor=dark_blue, fontName='Helvetica-Bold', leading=22)
+    label_style = ParagraphStyle('LabelStyle', fontSize=10, textColor=dark_blue, fontName='Helvetica-Bold', leading=14)
+    value_style = ParagraphStyle('ValueStyle', fontSize=10, textColor=colors.black, fontName='Helvetica', leading=14)
+    section_title_style = ParagraphStyle('SectionTitle', fontSize=11, textColor=colors.white, fontName='Helvetica-Bold', leading=14)
     
-    clinic_info_style = ParagraphStyle(
-        'ClinicInfo',
-        parent=styles['Normal'],
-        fontSize=9,
-        textColor=colors.HexColor('#555555'),
-        spaceAfter=1,
-        alignment=0
-    )
-    
-    section_heading_style = ParagraphStyle(
-        'SectionHeading',
-        parent=styles['Heading3'],
-        fontSize=9,
-        textColor=colors.HexColor('#FFFFFF'),
-        spaceAfter=0,
-        fontName='Helvetica-Bold',
-        leftIndent=5
-    )
-    
-    label_value_style = ParagraphStyle(
-        'LabelValue',
-        parent=styles['Normal'],
-        fontSize=8.5,
-        spaceAfter=3,
-        leading=12
-    )
-    
-    watermark_style = ParagraphStyle(
-        'Watermark',
-        parent=styles['Normal'],
-        fontSize=150,
-        textColor=colors.HexColor('#4a8fc4'),
-        alignment=1
-    )
-    
-    icon_style = ParagraphStyle(
-        'IconStyle',
-        parent=styles['Normal'],
-        fontSize=14,
-        textColor=colors.white,
-        alignment=1,
-        spaceAfter=0,
-        leading=14
-    )
-    
-    recommendation_style = ParagraphStyle(
-        'Recommendation',
-        parent=styles['Normal'],
-        fontSize=8.5,
-        spaceAfter=6,
-        leading=11,
-        textColor=colors.HexColor('#1a1a1a')
-    )
-    
-    footer_style = ParagraphStyle(
-        'FooterText',
-        parent=styles['Normal'],
-        fontSize=7,
-        textColor=colors.HexColor('#777777'),
-        alignment=1,
-        spaceAfter=1
-    )
-    
-    watermark_para = Paragraph("TC", ParagraphStyle(
-        'BackgroundWatermark',
-        parent=styles['Normal'],
-        fontSize=200,
-        textColor=colors.HexColor('#b3d9f2'),
-        alignment=1,
-        spaceAfter=0,
-        leading=200
-    ))
-    story.append(watermark_para)
-    story.append(Spacer(1, -1.2*inch))
-    
-    header_content = """<b style='font-size: 16px; color: #1a5490;'>TC &nbsp;&nbsp;&nbsp;&nbsp; BMI PRESCRIPTION REPORT</b>"""
-    story.append(Paragraph(header_content, clinic_header_style))
-    story.append(Paragraph("HealthCare Clinic & Wellness Center", clinic_info_style))
-    story.append(Paragraph("Certified Health Assessment Services | Reg. No: BMI-HC-2024", clinic_info_style))
-    story.append(Spacer(1, 0.12*inch))
-    
-    prescription_info = f"""
-    <b>Prescription ID:</b> {invoice_number} &nbsp;&nbsp;&nbsp;&nbsp; 
-    <b>Date:</b> {invoice_date_str} &nbsp;&nbsp;&nbsp;&nbsp; 
-    <b>Patient ID:</b> {patient_id}
-    """
-    story.append(Paragraph(prescription_info, label_value_style))
-    story.append(Spacer(1, 0.12*inch))
-    
-    header_table = Table([
-        ['PATIENT DETAILS']
-    ], colWidths=[7.2*inch])
+    # 1. Header with Circular Logo and Title
+    logo_circle = Table([[Paragraph("<b style='color:white;font-size:14px;'>TC</b>", ParagraphStyle('LogoText', alignment=1))]],
+                         colWidths=[0.45*inch], rowHeights=[0.45*inch])
+    logo_circle.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), dark_blue),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ROUNDEDCORNERS', [15, 15, 15, 15]), 
+    ]))
+
+    header_data = [[logo_circle, Paragraph(f"<b>BMI PRESCRIPTION REPORT</b>", title_style)]]
+    header_table = Table(header_data, colWidths=[0.6*inch, 6.9*inch])
     header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#2a75b8')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('PADDING', (0, 0), (-1, -1), 4),
-        ('ALIGNMENT', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
     ]))
     story.append(header_table)
-    story.append(Spacer(1, 0.05*inch))
-    
-    patient_info = f"""
-    <b>Patient Name:</b> {patient_name}
-    """
-    story.append(Paragraph(patient_info, label_value_style))
-    story.append(Spacer(1, 0.06*inch))
-    
-    measurements_header = Table([
-        ['HEIGHT', 'WEIGHT']
-    ], colWidths=[3.6*inch, 3.6*inch])
-    measurements_header.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#2a75b8')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('PADDING', (0, 0), (-1, -1), 5),
-        ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
+    story.append(Spacer(1, 0.15*inch))
+
+    # 2. Prescription Info with underline
+    info_data = [[
+        Paragraph(f"<b>Prescription ID:</b> <font color='black'>{invoice_number}</font>", label_style),
+        Paragraph(f"<b>Date:</b> <font color='black'>{invoice_date_str}</font>", label_style)
+    ]]
+    info_table = Table(info_data, colWidths=[4*inch, 3.5*inch])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LINEBELOW', (0, 0), (-1, -1), 1.5, dark_blue),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
-    story.append(measurements_header)
+    story.append(info_table)
+    story.append(Spacer(1, 0.2*inch))
+
+    # 3. Patient Details
+    story.append(Table([[Paragraph("PATIENT DETAILS", section_title_style)]], colWidths=[7.5*inch], 
+                       style=[('BACKGROUND', (0,0), (-1,-1), section_bg), ('PADDING', (0,0), (-1,-1), 6)]))
     
-    measurements_data = Table([
-        [str(height) + ' cm', str(weight) + ' kg']
-    ], colWidths=[3.6*inch, 3.6*inch])
-    measurements_data.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0f4f8')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('PADDING', (0, 0), (-1, -1), 6),
-        ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+    patient_data = [
+        [Paragraph(f"<b>Name:</b> {patient_name}", label_style)],
+        [Paragraph(f"<b>Age:</b> 46 yrs", label_style)]
+    ]
+    patient_table = Table(patient_data, colWidths=[7.5*inch])
+    patient_table.setStyle(TableStyle([
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
-    story.append(measurements_data)
-    story.append(Spacer(1, 0.08*inch))
+    story.append(patient_table)
+    story.append(Spacer(1, 0.2*inch))
+
+    # 4. Measurements
+    story.append(Table([[Paragraph("MEASUREMENTS", section_title_style)]], colWidths=[7.5*inch], 
+                       style=[('BACKGROUND', (0,0), (-1,-1), section_bg), ('PADDING', (0,0), (-1,-1), 6)]))
     
-    bmi_color_map = {
-        'Underweight': '#3498db',
-        'Normal': '#2ecc71',
-        'Overweight': '#f39c12',
-        'Obese': '#e74c3c'
-    }
-    bmi_color = bmi_color_map.get(category, '#7f8c8d')
-    
-    bmi_header = Table([
-        ['BMI VALUE', 'CATEGORY']
-    ], colWidths=[3.6*inch, 3.6*inch])
-    bmi_header.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(bmi_color)),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('PADDING', (0, 0), (-1, -1), 4),
-        ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
+    meas_data = [[
+        Paragraph(f"<b>Height:</b> {height} cm", label_style),
+        Paragraph(f"<b>Weight:</b> {weight} kg", label_style)
+    ]]
+    meas_table = Table(meas_data, colWidths=[1.8*inch, 5.7*inch])
+    meas_table.setStyle(TableStyle([
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
     ]))
-    story.append(bmi_header)
-    
-    bmi_data = Table([
-        [f'{bmi:.2f}', category.upper()]
-    ], colWidths=[3.6*inch, 3.6*inch])
-    bmi_data.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(bmi_color)),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('PADDING', (0, 0), (-1, -1), 8),
-        ('ALIGNMENT', (0, 0), (-1, -1), 'CENTER'),
+    story.append(meas_table)
+    story.append(Spacer(1, 0.2*inch))
+
+    # 5. Highlighted BMI Result Box
+    badge_table = Table([[Paragraph(category.upper(), ParagraphStyle('Badge', alignment=1, textColor=bmi_color, fontSize=12, fontName='Helvetica-Bold'))]], 
+                        colWidths=[1.8*inch], style=[
+                            ('BACKGROUND', (0,0), (-1,-1), colors.white),
+                            ('ROUNDEDCORNERS', [5, 5, 5, 5]),
+                            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                            ('PADDING', (0,0), (-1,-1), 6)
+                        ])
+
+    bmi_box_data = [[Paragraph(f"<b style='color:white;font-size:32px;'>{bmi:.1f}</b>", ParagraphStyle('BMIVal', alignment=1))],
+                    [Paragraph("<font color='white' size='11'>BMI Value</font>", ParagraphStyle('BMILabel', alignment=1))],
+                    [Spacer(1, 0.15*inch)],
+                    [badge_table]]
+    bmi_box_table = Table(bmi_box_data, colWidths=[7.5*inch])
+    bmi_box_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), bmi_color),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 20),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
     ]))
-    story.append(bmi_data)
-    story.append(Spacer(1, 0.12*inch))
+    story.append(bmi_box_table)
+    story.append(Spacer(1, 0.2*inch))
+
+    # 6. Assessment Charges
+    story.append(Table([[Paragraph("ASSESSMENT CHARGES", section_title_style)]], colWidths=[7.5*inch], 
+                       style=[('BACKGROUND', (0,0), (-1,-1), section_bg), ('PADDING', (0,0), (-1,-1), 6)]))
     
-    clinical_header = Table([
-        ['CLINICAL NOTES & REMARKS']
-    ], colWidths=[7.2*inch])
-    clinical_header.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#2a75b8')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('PADDING', (0, 0), (-1, -1), 6),
+    charges_data = [
+        [Paragraph("Consultation & Evaluation", value_style), Paragraph("INR 500", ParagraphStyle('Right', alignment=2))],
+        [Paragraph("BMI Assessment & Analysis", value_style), Paragraph("INR 300", ParagraphStyle('Right', alignment=2))],
+        [Paragraph("Health Report", value_style), Paragraph("INR 200", ParagraphStyle('Right', alignment=2))],
+        [Paragraph("<b>TOTAL</b>", label_style), Paragraph(f"<b style='color:#e74c3c;'>INR {total_amount}</b>", ParagraphStyle('Total', alignment=2))]
+    ]
+    charges_table = Table(charges_data, colWidths=[5.5*inch, 2*inch])
+    charges_table.setStyle(TableStyle([
+        ('LINEBELOW', (0, 0), (-1, -3), 0.5, colors.grey),
+        ('BACKGROUND', (0, 3), (-1, 3), total_bg),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
-    story.append(clinical_header)
-    story.append(Spacer(1, 0.06*inch))
-    
-    recommendations = {
-        'Underweight': 'Increase caloric intake with nutrient-dense foods. Consult nutritionist for personalized diet plan. Regular health monitoring recommended.',
-        'Normal': 'Maintain current weight with balanced diet and regular exercise. Continue healthy lifestyle practices. Annual check-ups recommended.',
-        'Overweight': 'Reduce daily caloric intake by 300-500 kcal. Increase physical activity to 150 min/week. Consult healthcare provider for weight management strategies.',
-        'Obese': 'Immediate medical consultation required. Comprehensive weight management program recommended. Regular monitoring and lifestyle modification essential.'
-    }
-    
-    recommendation_text = recommendations.get(category, 'Consult healthcare professional for personalized advice.')
-    story.append(Paragraph(recommendation_text, recommendation_style))
-    story.append(Spacer(1, 0.12*inch))
-    
-    charges_header = Table([
-        ['ASSESSMENT CHARGES', 'Amount (₹)']
-    ], colWidths=[5.4*inch, 1.8*inch])
-    charges_header.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#1a5490')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('PADDING', (0, 0), (-1, -1), 4),
-        ('ALIGNMENT', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGNMENT', (1, 0), (1, -1), 'RIGHT'),
+    story.append(charges_table)
+    story.append(Spacer(1, 0.3*inch))
+
+    # 7. Terms Box
+    terms_content = [[
+        Paragraph("<b>Terms:</b>", label_style),
+        Paragraph("Due within 30 days from assessment date.", value_style)
+    ]]
+    terms_table = Table(terms_content, colWidths=[7.5*inch])
+    terms_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), light_yellow_bg),
+        ('LINEBEFORE', (0, 0), (0, -1), 4, border_orange),
+        ('PADDING', (0, 0), (-1, -1), 12),
     ]))
-    story.append(charges_header)
-    
-    charges_data = Table([
-        ['Consultation & Evaluation', f'₹{consultation_fee:.2f}'],
-        ['BMI Assessment & Analysis', f'₹{bmi_assessment_fee:.2f}'],
-        ['Health Report & Recommendations', f'₹{health_report_fee:.2f}'],
-    ], colWidths=[5.4*inch, 1.8*inch])
-    charges_data.setStyle(TableStyle([
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('PADDING', (0, 0), (-1, -1), 4),
-        ('ALIGNMENT', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGNMENT', (1, 0), (1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fafafa')),
-    ]))
-    story.append(charges_data)
-    story.append(Spacer(1, 0.05*inch))
-    
-    total_data = Table([
-        ['TOTAL ASSESSMENT FEE', f'₹{total_amount:.2f}'],
-    ], colWidths=[5.4*inch, 1.8*inch])
-    total_data.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#2c3e50')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('PADDING', (0, 0), (-1, -1), 5),
-        ('ALIGNMENT', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGNMENT', (1, 0), (1, -1), 'RIGHT'),
-    ]))
-    story.append(total_data)
-    story.append(Spacer(1, 0.08*inch))
-    
-    terms_header = Table([
-        ['PAYMENT TERMS & CONDITIONS']
-    ], colWidths=[7.2*inch])
-    terms_header.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#34495e')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('PADDING', (0, 0), (-1, -1), 4),
-    ]))
-    story.append(terms_header)
-    story.append(Spacer(1, 0.04*inch))
-    
-    terms_text = f"""
-    • <b>Payment Due:</b> {payment_terms}<br/>
-    • This assessment is for informational and health guidance purposes only<br/>
-    • Not a substitute for professional medical diagnosis or treatment<br/>
-    • Consult physician for medical concerns or health decisions
-    """
-    story.append(Paragraph(terms_text, label_value_style))
-    
-    story.append(Spacer(1, 0.10*inch))
-    story.append(Paragraph("_" * 95, footer_style))
-    story.append(Spacer(1, 0.04*inch))
-    story.append(Paragraph("Certified Health Assessment | HealthCare Clinic & Wellness Center | Authorized by Ministry of Health", footer_style))
-    story.append(Paragraph("This prescription is generated electronically and is valid without a signature", footer_style))
-    
+    story.append(terms_table)
+
     doc.build(story)
     return pdf_path
 
@@ -929,6 +785,42 @@ def send_invoice(invoice_id):
         return jsonify({'success': True, 'message': 'Invoice sent successfully'}), 200
     else:
         return jsonify({'success': False, 'error': 'Failed to send invoice'}), 500
+
+@app.route('/download-invoice/<int:invoice_id>')
+@login_required
+def download_invoice(invoice_id):
+    db = get_db()
+    cursor = db.cursor()
+    
+    cursor.execute(
+        'SELECT i.*, b.height, b.weight, b.bmi, b.category FROM invoices i '
+        'JOIN bmi_records b ON i.record_id = b.id '
+        'WHERE i.id = ? AND i.patient_id = ?',
+        (invoice_id, session['user_id'])
+    )
+    invoice = cursor.fetchone()
+    db.close()
+    
+    if not invoice:
+        return "Invoice not found", 404
+    
+    invoice_path = generate_invoice_pdf(
+        session['user_name'],
+        session['user_id'],
+        invoice['invoice_number'],
+        invoice['height'],
+        invoice['weight'],
+        invoice['bmi'],
+        invoice['category'],
+        invoice['consultation_fee'],
+        invoice['bmi_assessment_fee'],
+        invoice['health_report_fee'],
+        invoice['total_amount'],
+        invoice['payment_terms'],
+        invoice['invoice_date']
+    )
+    
+    return send_file(invoice_path, as_attachment=True, download_name=f"Invoice_{invoice['invoice_number']}.pdf")
 
 @app.route('/send-invoice-formsubmit', methods=['POST'])
 @login_required
