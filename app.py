@@ -24,9 +24,12 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(16)
+# Using a fixed secret key for PythonAnywhere stability
+app.secret_key = 'bmi-health-tracker-secret-key-123'
 
-DATABASE = 'database.db'
+# Get the absolute path of the project directory
+basedir = os.path.abspath(os.path.dirname(__file__))
+DATABASE = os.path.join(basedir, 'database.db')
 IST = timezone(timedelta(hours=5, minutes=30))
 
 def get_ist_now():
