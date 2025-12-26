@@ -3,23 +3,25 @@ import sqlite3
 import hashlib
 import secrets
 import traceback
+import io
+import smtplib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib import colors
-import smtplib
+from dotenv import load_dotenv
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
-import io
-from dotenv import load_dotenv
-import os
+
+# ReportLab Imports
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 load_dotenv()
 
@@ -31,6 +33,11 @@ app.secret_key = 'bmi-health-tracker-secret-key-123'
 basedir = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(basedir, 'database.db')
 IST = timezone(timedelta(hours=5, minutes=30))
+
+# Absolute path for PDF storage
+TEMP_PDF_DIR = os.path.join(basedir, 'temp_pdfs')
+if not os.path.exists(TEMP_PDF_DIR):
+    os.makedirs(TEMP_PDF_DIR)
 
 def get_ist_now():
     return datetime.now(IST)
@@ -161,10 +168,7 @@ def get_health_advice(category):
 
 def generate_pdf(patient_name, patient_id, height, weight, bmi, category, date_str, gender=None, age=None):
     pdf_filename = f"BMI_Report_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    pdf_path = os.path.join('temp_pdfs', pdf_filename)
-    
-    if not os.path.exists('temp_pdfs'):
-        os.makedirs('temp_pdfs')
+    pdf_path = os.path.join(TEMP_PDF_DIR, pdf_filename)
     
     doc = SimpleDocTemplate(pdf_path, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
     story = []
@@ -299,17 +303,11 @@ def generate_pdf(patient_name, patient_id, height, weight, bmi, category, date_s
     doc.build(story)
     return pdf_path
 
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-
 def generate_invoice_pdf(patient_name, patient_id, invoice_number, height, weight, bmi, category, 
                          consultation_fee, bmi_assessment_fee, health_report_fee, 
                          total_amount, payment_terms, invoice_date_str, age=None, gender=None):
     pdf_filename = f"BMI_Report_{invoice_number}_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    pdf_path = os.path.join('temp_pdfs', pdf_filename)
-    
-    if not os.path.exists('temp_pdfs'):
-        os.makedirs('temp_pdfs')
+    pdf_path = os.path.join(TEMP_PDF_DIR, pdf_filename)
     
     # Use A4 as requested
     doc = SimpleDocTemplate(pdf_path, pagesize=A4, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
@@ -1065,6 +1063,5 @@ def logout():
 
 if __name__ == '__main__':
     init_db()
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
