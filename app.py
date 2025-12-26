@@ -999,7 +999,12 @@ def download_invoice(invoice_id):
         gender=invoice['gender']
     )
     
-    return send_file(invoice_path, as_attachment=True, download_name=f"Invoice_{invoice['invoice_number']}.pdf")
+    return send_file(
+        invoice_path, 
+        mimetype='application/pdf',
+        as_attachment=True, 
+        download_name=f"Prescription_{invoice['invoice_number']}.pdf"
+    )
 
 @app.route('/send-invoice-formsubmit', methods=['POST'])
 @login_required
