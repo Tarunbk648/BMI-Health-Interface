@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}BMI Result - BMI Health Tracker{% endblock %}
+{% block title %}BMI Result - LifeTrack Health Hub{% endblock %}
 
 {% block content %}
 <div class="result-container">
@@ -22,6 +22,14 @@
         
         <div class="result-details">
             <table class="details-table">
+                <tr>
+                    <td class="detail-label">Age:</td>
+                    <td class="detail-value">{{ record['age'] if record['age'] else 'N/A' }} yrs</td>
+                </tr>
+                <tr>
+                    <td class="detail-label">Gender:</td>
+                    <td class="detail-value">{{ record['gender'] if record['gender'] else 'N/A' }}</td>
+                </tr>
                 <tr>
                     <td class="detail-label">Height:</td>
                     <td class="detail-value">{{ record['height'] }} cm</td>
@@ -46,69 +54,24 @@
             <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
                 ← Back to Dashboard
             </a>
-            <button id="createInvoiceBtn" class="btn btn-success" title="Create an invoice for this BMI assessment">
-                🧾 Create Invoice
+            <button id="createInvoiceBtn" class="btn btn-success" title="Download your health report PDF">
+                📥 Download Report
             </button>
         </div>
         
         <div id="messageDiv" style="margin-top: 20px;"></div>
-        
-        <div id="invoiceSection" style="display: none; margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
-            <h3 style="margin-top: 0;">Invoice Options</h3>
-            <p id="invoiceInfo" style="margin: 10px 0;"></p>
-            
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button id="downloadInvoiceBtn" class="btn btn-info" style="flex: 1;">
-                    📥 Download Invoice (PDF)
-                </button>
-            </div>
-            
-            <form id="prescriptionForm" method="POST" action="" style="display: none; margin-top: 20px;">
-                <h4>Prescription Data (Hidden Form - Will be sent to email)</h4>
-                <input type="hidden" name="_subject" value="BMI Prescription Report">
-                <input type="hidden" name="_template" value="table">
-                <input type="hidden" name="_captcha" value="false">
-                <input type="hidden" name="_next" value="/thank-you">
-                
-                <input type="hidden" name="1_BMI_Prescription_Report_Header" value="BMI PRESCRIPTION REPORT">
-                <input type="hidden" id="prescriptionId" name="2_Prescription_ID" value="">
-                <input type="hidden" id="dateTime" name="3_Date_and_Time" value="">
-                
-                <input type="hidden" id="patientName" name="4_Patient_Details_Name" value="{{ session.get('user_name', '') }}">
-                <input type="hidden" id="patientAge" name="5_Patient_Age" value="">
-                
-                <input type="hidden" id="height" name="6_Height_cm" value="{{ record['height'] }}">
-                <input type="hidden" id="weight" name="7_Weight_kg" value="{{ record['weight'] }}">
-                
-                <input type="hidden" id="bmiValue" name="8_BMI_Value" value="{{ record['bmi'] }}">
-                <input type="hidden" id="bmiCategory" name="9_BMI_Category" value="{{ record['category'] }}">
-                
-                <input type="hidden" name="10_Consultation_Evaluation" value="₹500.00">
-                <input type="hidden" name="11_BMI_Assessment_Analysis" value="₹300.00">
-                <input type="hidden" name="12_Health_Report" value="₹200.00">
-                <input type="hidden" name="13_Total_Amount" value="₹1000.00">
-                
-                <input type="hidden" name="14_Payment_Terms" value="Due within 30 days from assessment date">
-                
-                <input type="hidden" id="userEmail" name="Email" value="">
-            </form>
-        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let currentInvoiceId = null;
-    
     document.getElementById('createInvoiceBtn').addEventListener('click', async () => {
         const messageDiv = document.getElementById('messageDiv');
         const btn = document.getElementById('createInvoiceBtn');
-        const invoiceSection = document.getElementById('invoiceSection');
-        const invoiceInfo = document.getElementById('invoiceInfo');
         
         btn.disabled = true;
-        btn.textContent = '🧾 Creating Invoice...';
+        btn.textContent = '📥 Generating...';
         
         try {
             const recordId = {{ record['id'] }};
@@ -116,121 +79,28 @@
             const data = await response.json();
             
             if (data.success) {
-                currentInvoiceId = data.invoice_id;
-                
-                document.getElementById('prescriptionId').value = data.invoice_number;
-                document.getElementById('dateTime').value = data.invoice_date;
-                document.getElementById('patientName').value = data.patient_name;
-                document.getElementById('patientAge').value = data.age ? data.age + ' years' : 'Not provided';
-                document.getElementById('height').value = data.height;
-                document.getElementById('weight').value = data.weight;
-                document.getElementById('bmiValue').value = data.bmi.toFixed(2);
-                document.getElementById('bmiCategory').value = data.category;
-                document.getElementById('userEmail').value = '{{ session.get("user_email", "") }}';
-                
                 messageDiv.className = 'success-messages';
-                messageDiv.innerHTML = `<p>✅ Invoice created successfully!</p>`;
+                messageDiv.innerHTML = `<p>✅ Report ready! Starting download...</p>`;
                 
-                invoiceInfo.innerHTML = `
-                    <div style="position: relative; background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); padding: 16px; border-radius: 8px; box-shadow: 0 4px 12px rgba(26, 84, 144, 0.12); border: 1px solid #e0e7f1; overflow: hidden;">
-                        <!-- Background Watermark -->
-                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); font-size: 320px; font-weight: 700; color: rgba(26, 84, 144, 0.12); z-index: 0; pointer-events: none; line-height: 1;">TC</div>
-                        
-                        <!-- Content Container -->
-                        <div style="position: relative; z-index: 1;">
-                            <!-- Header Section -->
-                            <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid #1a5490;">
-                                <div style="color: #1a5490; font-weight: bold; font-size: 15px; margin-bottom: 6px;"><span style="display: inline-block; width: 28px; height: 28px; background: #1a5490; color: white; border-radius: 50%; text-align: center; line-height: 28px; font-size: 12px; font-weight: 700; margin-right: 8px;">TC</span>BMI PRESCRIPTION REPORT</div>
-                                <div style="color: #555; font-size: 10px; display: flex; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
-                                    <span><strong style="color: #1a5490;">Prescription ID:</strong> <span style="font-family: monospace; font-weight: 600;">${data.invoice_number}</span></span>
-                                    <span><strong style="color: #1a5490;">Date:</strong> <span style="font-weight: 600;">${data.invoice_date}</span></span>
-                                </div>
-                            </div>
-
-                            <!-- Patient Information -->
-                            <div style="margin-bottom: 10px;">
-                                <div style="background: linear-gradient(90deg, #2a75b8 0%, #3d8fd4 100%); color: white; padding: 6px 10px; border-radius: 3px 3px 0 0; font-weight: 600; font-size: 11px;">PATIENT DETAILS</div>
-                                <div style="background-color: #f7fbff; padding: 8px 10px; border-radius: 0 0 3px 3px; border: 1px solid #d4dfe9; border-top: none; font-size: 10px;">
-                                    <div style="margin-bottom: 4px;"><strong style="color: #1a5490;">Name:</strong> ${data.patient_name}</div>
-                                    <div><strong style="color: #1a5490;">Age:</strong> ${data.age ? data.age + ' yrs' : 'N/A'}</div>
-                                </div>
-                            </div>
-
-                            <!-- Measurements -->
-                            <div style="margin-bottom: 10px;">
-                                <div style="background: linear-gradient(90deg, #2a75b8 0%, #3d8fd4 100%); color: white; padding: 6px 10px; border-radius: 3px 3px 0 0; font-weight: 600; font-size: 11px;">MEASUREMENTS</div>
-                                <div style="background-color: #f7fbff; padding: 8px 10px; border-radius: 0 0 3px 3px; border: 1px solid #d4dfe9; border-top: none; font-size: 10px; display: flex; gap: 15px;">
-                                    <div><strong style="color: #1a5490;">Height:</strong> ${data.height} cm</div>
-                                    <div><strong style="color: #1a5490;">Weight:</strong> ${data.weight} kg</div>
-                                </div>
-                            </div>
-
-                            <!-- BMI Result -->
-                            <div style="margin-bottom: 10px;">
-                                <div style="background: linear-gradient(135deg, ${data.category === 'Obese' ? '#e74c3c' : data.category === 'Overweight' ? '#f39c12' : data.category === 'Normal' ? '#2ecc71' : '#3498db'} 0%, ${data.category === 'Obese' ? '#c0392b' : data.category === 'Overweight' ? '#d68910' : data.category === 'Normal' ? '#27ae60' : '#2980b9'} 100%); color: white; padding: 10px; border-radius: 3px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 2px;">${data.bmi}</div>
-                                    <div style="font-size: 10px; margin-bottom: 4px; opacity: 0.9;">BMI Value</div>
-                                    <div style="background-color: rgba(255,255,255,0.25); padding: 3px 8px; border-radius: 3px; display: inline-block; font-weight: bold; font-size: 10px;">${data.category.toUpperCase()}</div>
-                                </div>
-                            </div>
-
-                            <!-- Charges Section -->
-                            <div style="margin-bottom: 10px;">
-                                <div style="background: linear-gradient(90deg, #2a75b8 0%, #3d8fd4 100%); color: white; padding: 6px 10px; border-radius: 3px 3px 0 0; font-weight: 600; font-size: 11px;">ASSESSMENT CHARGES</div>
-                                <div style="background-color: #f7fbff; padding: 8px 10px; border-radius: 0 0 3px 3px; border: 1px solid #d4dfe9; border-top: none; font-size: 9px;">
-                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e0e7f1; padding: 3px 0; margin-bottom: 2px;">
-                                        <span>Consultation & Evaluation</span>
-                                        <span style="font-weight: 600;">₹500</span>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e0e7f1; padding: 3px 0; margin-bottom: 2px;">
-                                        <span>BMI Assessment & Analysis</span>
-                                        <span style="font-weight: 600;">₹300</span>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e0e7f1; padding: 3px 0; margin-bottom: 4px;">
-                                        <span>Health Report</span>
-                                        <span style="font-weight: 600;">₹200</span>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; font-weight: bold; color: #1a5490; background: #e3f2fd; padding: 4px 6px; border-radius: 2px; font-size: 10px;">
-                                        <span>TOTAL</span>
-                                        <span style="color: #e74c3c;">₹1,000</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Payment Terms -->
-                            <div style="background: linear-gradient(90deg, #fef5e7 0%, #fef9e7 100%); padding: 8px 10px; border-radius: 3px; font-size: 9px; color: #555; border-left: 3px solid #f39c12;">
-                                <strong style="color: #1a5490; display: block; margin-bottom: 3px;">Terms:</strong>
-                                <span>Due within 30 days from assessment date.</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                // Trigger immediate download
+                window.location.href = `/download-invoice/${data.invoice_id}`;
                 
-                invoiceSection.style.display = 'block';
-                btn.textContent = '🧾 Invoice Created!';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = '📥 Download Report';
+                }, 2000);
             } else {
                 messageDiv.className = 'error-messages';
                 messageDiv.innerHTML = `<p>❌ Error: ${data.error}</p>`;
                 btn.disabled = false;
-                btn.textContent = '🧾 Create Invoice';
+                btn.textContent = '📥 Download Report';
             }
         } catch (error) {
             messageDiv.className = 'error-messages';
-            messageDiv.innerHTML = '<p>❌ Error creating invoice. Please try again.</p>';
+            messageDiv.innerHTML = '<p>❌ Error generating report. Please try again.</p>';
             btn.disabled = false;
-            btn.textContent = '🧾 Create Invoice';
+            btn.textContent = '📥 Download Report';
         }
-    });
-    
-    document.getElementById('downloadInvoiceBtn').addEventListener('click', () => {
-        if (!currentInvoiceId) {
-            const messageDiv = document.getElementById('messageDiv');
-            messageDiv.className = 'error-messages';
-            messageDiv.innerHTML = `<p>❌ Invoice not found. Please create it first.</p>`;
-            return;
-        }
-        
-        window.location.href = `/download-invoice/${currentInvoiceId}`;
     });
 </script>
 {% endblock %}

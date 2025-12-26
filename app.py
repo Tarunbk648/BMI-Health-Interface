@@ -90,8 +90,13 @@ def init_db():
             cursor.execute('ALTER TABLE bmi_records ADD COLUMN age INTEGER')
             db.commit()
             print("DEBUG: 'age' column added successfully")
+        if 'gender' not in columns:
+            print("DEBUG: Adding 'gender' column to bmi_records table...")
+            cursor.execute('ALTER TABLE bmi_records ADD COLUMN gender TEXT')
+            db.commit()
+            print("DEBUG: 'gender' column added successfully")
     except Exception as e:
-        print(f"DEBUG: Error checking/adding age column: {e}")
+        print(f"DEBUG: Error checking/adding columns: {e}")
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS invoices (
@@ -154,236 +159,402 @@ def get_health_advice(category):
     }
     return advice.get(category, '')
 
-def generate_pdf(patient_name, patient_id, height, weight, bmi, category, date_str):
+def generate_pdf(patient_name, patient_id, height, weight, bmi, category, date_str, gender=None, age=None):
     pdf_filename = f"BMI_Report_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf_path = os.path.join('temp_pdfs', pdf_filename)
     
     if not os.path.exists('temp_pdfs'):
         os.makedirs('temp_pdfs')
     
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
     story = []
-    styles = getSampleStyleSheet()
     
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#2c3e50'),
-        spaceAfter=30,
-        alignment=1
-    )
+    # LifeTrack Health Hub Palette
+    hospital_blue = colors.HexColor('#0F4C81')
+    text_dark = colors.HexColor('#1F2937')
+    text_muted = colors.HexColor('#4B5563')
+    border_gray = colors.HexColor('#E5E7EB')
+    light_blue = colors.HexColor('#F0F7FF')
     
-    heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.HexColor('#34495e'),
-        spaceAfter=12
-    )
-    
-    normal_style = ParagraphStyle(
-        'CustomNormal',
-        parent=styles['Normal'],
-        fontSize=11,
-        spaceAfter=10
-    )
-    
-    story.append(Paragraph("BMI Health Report", title_style))
-    story.append(Spacer(1, 0.3*inch))
-    
-    data = [
-        ['Patient Name:', patient_name],
-        ['Patient ID:', str(patient_id)],
-        ['Height (cm):', str(height)],
-        ['Weight (kg):', str(weight)],
-        ['BMI Value:', f'{bmi:.2f}'],
-        ['BMI Category:', category],
-        ['Report Date:', date_str]
+    # Styles
+    header_style = ParagraphStyle('Header', fontSize=22, fontName='Helvetica-Bold', textColor=hospital_blue, leading=26)
+    sub_header_style = ParagraphStyle('SubHeader', fontSize=10, fontName='Helvetica-Bold', textColor=text_muted, leading=14)
+    contact_style = ParagraphStyle('Contact', fontSize=9, fontName='Helvetica', textColor=text_muted, alignment=TA_RIGHT, leading=12)
+    section_title_style = ParagraphStyle('SecTitle', fontSize=10, fontName='Helvetica-Bold', textColor=colors.white, leftIndent=8)
+    label_style = ParagraphStyle('Label', fontSize=9, fontName='Helvetica-Bold', textColor=text_dark)
+    value_style = ParagraphStyle('Value', fontSize=9, fontName='Helvetica', textColor=text_dark)
+    interpretation_style = ParagraphStyle('Interp', fontSize=10, fontName='Helvetica', textColor=text_dark, leading=14)
+    sig_verify_style = ParagraphStyle('SigVerify', fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=text_muted)
+
+    # 1. Header & Branding
+    brand_content = [
+        [
+            [Paragraph("LifeTrack Health Hub", header_style), 
+             Paragraph("PERSONAL HEALTH REPORT", sub_header_style)],
+            Paragraph("support@lifetrack.com<br/>+91 98765 43210<br/>www.lifetrack.com", contact_style)
+        ]
     ]
+    brand_table = Table(brand_content, colWidths=[4.2*inch, 3.0*inch])
+    brand_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, hospital_blue),
+    ]))
+    story.append(brand_table)
+    story.append(Spacer(1, 0.2*inch))
+
+    # 2. Patient Information Section
+    story.append(Table([[Paragraph("PATIENT INFORMATION", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
     
-    table = Table(data, colWidths=[2*inch, 3*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecf0f1')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    patient_data = [
+        [Paragraph("Patient Name", label_style), Paragraph(f": {patient_name}", value_style), 
+         Paragraph("Patient ID", label_style), Paragraph(f": PID-{patient_id}", value_style)],
+        [Paragraph("Gender", label_style), Paragraph(f": {gender}" if gender and str(gender).strip() else ": Not Specified", value_style), 
+         Paragraph("Report Date", label_style), Paragraph(f": {date_str}", value_style)]
+    ]
+    patient_table = Table(patient_data, colWidths=[1.2*inch, 2.4*inch, 1.2*inch, 2.4*inch])
+    patient_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1, -2), 0.5, border_gray),
+    ]))
+    story.append(patient_table)
+    story.append(Spacer(1, 0.25*inch))
+
+    # 3. Anthropometric Measurements
+    story.append(Table([[Paragraph("ANTHROPOMETRIC MEASUREMENTS", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    
+    meas_data = [
+        [Paragraph("Height (cm)", label_style), Paragraph(f"{height} cm", value_style), 
+         Paragraph("Weight (kg)", label_style), Paragraph(f"{weight} kg", value_style)],
+        [Paragraph("BMI Value", label_style), Paragraph(f"{bmi:.2f}", value_style),
+         Paragraph("Category", label_style), Paragraph(category, value_style)]
+    ]
+    meas_table = Table(meas_data, colWidths=[1.2*inch, 2.4*inch, 1.2*inch, 2.4*inch])
+    meas_table.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, border_gray),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BACKGROUND', (0,0), (-1,-1), colors.white),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(meas_table)
+    story.append(Spacer(1, 0.3*inch))
+
+    # 4. Highlighted BMI Card
+    bmi_val_style = ParagraphStyle('BMIVal', fontSize=36, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=hospital_blue)
+    bmi_cat_style = ParagraphStyle('BMICat', fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=hospital_blue)
+    
+    bmi_card_content = [
+        [Paragraph(f"{bmi:.2f}", bmi_val_style)],
+        [Paragraph(category.upper(), bmi_cat_style)]
+    ]
+    bmi_card = Table(bmi_card_content, colWidths=[2.5*inch])
+    bmi_card.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1.5, hospital_blue),
+        ('BACKGROUND', (0,0), (-1,-1), light_blue),
+        ('ROUNDEDCORNERS', [15, 15, 15, 15]),
+        ('TOPPADDING', (0,0), (-1,-1), 15),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 15),
     ]))
     
-    story.append(table)
-    story.append(Spacer(1, 0.4*inch))
-    
-    story.append(Paragraph("Health Advice", heading_style))
-    advice = get_health_advice(category)
-    story.append(Paragraph(advice, normal_style))
-    
+    story.append(Table([[bmi_card]], colWidths=[7.2*inch], style=[('ALIGN', (0,0), (-1,-1), 'CENTER')]))
     story.append(Spacer(1, 0.3*inch))
-    story.append(Paragraph("Disclaimer: This report is for informational purposes only. Please consult a healthcare professional for personalized advice.", normal_style))
+
+    # 5. Health Advice
+    story.append(Table([[Paragraph("HEALTH ADVICE", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    
+    advice = get_health_advice(category)
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph(advice, interpretation_style))
+    
+    story.append(Spacer(1, 1.0*inch))
+    
+    # Authorized Signature Section
+    sig_content = [
+        [Paragraph("Authorized Signature", ParagraphStyle('SigText', fontSize=10, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=text_dark))],
+        [Paragraph("LifeTrack Health Hub", ParagraphStyle('SigSub', fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=text_dark))],
+        [Paragraph("Digitally Verified Document", sig_verify_style)]
+    ]
+    
+    sig_table = Table(sig_content, colWidths=[2.5*inch])
+    sig_table.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,0), 0.75, text_dark),
+        ('TOPPADDING', (0,0), (-1,0), 8),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    
+    container_table = Table([[sig_table]], colWidths=[7.2*inch])
+    container_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
+    ]))
+    story.append(container_table)
+    
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph("This is a digitally generated report. For medical diagnosis, please consult a healthcare professional.", sig_verify_style))
     
     doc.build(story)
     return pdf_path
 
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
 def generate_invoice_pdf(patient_name, patient_id, invoice_number, height, weight, bmi, category, 
                          consultation_fee, bmi_assessment_fee, health_report_fee, 
-                         total_amount, payment_terms, invoice_date_str):
-    pdf_filename = f"BMI_Prescription_{invoice_number}_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                         total_amount, payment_terms, invoice_date_str, age=None, gender=None):
+    pdf_filename = f"BMI_Report_{invoice_number}_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf_path = os.path.join('temp_pdfs', pdf_filename)
     
     if not os.path.exists('temp_pdfs'):
         os.makedirs('temp_pdfs')
     
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+    # Use A4 as requested
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
     story = []
     styles = getSampleStyleSheet()
     
-    # Modern UI Colors from Dashboard
-    dark_blue = colors.HexColor('#1a5490')
-    section_bg = colors.HexColor('#4a8fc4')
-    total_bg = colors.HexColor('#e3f2fd')
-    total_red = colors.HexColor('#e74c3c')
-    light_yellow_bg = colors.HexColor('#fef9e7')
-    border_orange = colors.HexColor('#f39c12')
+    # LifeTrack Health Hub Palette
+    hospital_blue = colors.HexColor('#0F4C81')
+    text_dark = colors.HexColor('#1F2937')
+    text_muted = colors.HexColor('#4B5563')
+    border_gray = colors.HexColor('#E5E7EB')
+    light_blue = colors.HexColor('#F0F7FF')
     
-    # Category Colors
+    # Category Colors (Professional Hospital Standards)
     bmi_colors = {
-        'Underweight': colors.HexColor('#3498db'),
-        'Normal': colors.HexColor('#2ecc71'),
-        'Overweight': colors.HexColor('#d98d1a'),
-        'Obese': colors.HexColor('#e74c3c')
+        'Underweight': colors.HexColor('#2563EB'), # Blue
+        'Normal': colors.HexColor('#059669'),      # Green
+        'Overweight': colors.HexColor('#D97706'),  # Amber
+        'Obese': colors.HexColor('#DC2626')        # Red
     }
-    bmi_color = bmi_colors.get(category, dark_blue)
+    status_color = bmi_colors.get(category, hospital_blue)
+
+    # Risk Level & Classification
+    risk_data = {
+        'Underweight': ('High Risk', 'Nutritional Deficit'),
+        'Normal': ('Low Risk', 'Optimal Health Range'),
+        'Overweight': ('Moderate Risk', 'Increased Health Risk'),
+        'Obese': ('High Risk', 'Significant Health Risk')
+    }
+    risk_level, classification = risk_data.get(category, ('N/A', 'N/A'))
 
     # Styles
-    title_style = ParagraphStyle('TitleStyle', fontSize=18, textColor=dark_blue, fontName='Helvetica-Bold', leading=22)
-    label_style = ParagraphStyle('LabelStyle', fontSize=10, textColor=dark_blue, fontName='Helvetica-Bold', leading=14)
-    value_style = ParagraphStyle('ValueStyle', fontSize=10, textColor=colors.black, fontName='Helvetica', leading=14)
-    section_title_style = ParagraphStyle('SectionTitle', fontSize=11, textColor=colors.white, fontName='Helvetica-Bold', leading=14)
+    header_style = ParagraphStyle('Header', fontSize=22, fontName='Helvetica-Bold', textColor=hospital_blue, leading=26)
+    sub_header_style = ParagraphStyle('SubHeader', fontSize=10, fontName='Helvetica-Bold', textColor=text_muted, leading=14)
+    contact_style = ParagraphStyle('Contact', fontSize=9, fontName='Helvetica', textColor=text_muted, alignment=TA_RIGHT, leading=12)
     
-    # 1. Header with Circular Logo and Title
-    logo_circle = Table([[Paragraph("<b style='color:white;font-size:14px;'>TC</b>", ParagraphStyle('LogoText', alignment=1))]],
-                         colWidths=[0.45*inch], rowHeights=[0.45*inch])
-    logo_circle.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, 0), dark_blue),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ROUNDEDCORNERS', [15, 15, 15, 15]), 
-    ]))
+    section_title_style = ParagraphStyle('SecTitle', fontSize=10, fontName='Helvetica-Bold', textColor=colors.white, leftIndent=8)
+    label_style = ParagraphStyle('Label', fontSize=9, fontName='Helvetica-Bold', textColor=text_dark)
+    value_style = ParagraphStyle('Value', fontSize=9, fontName='Helvetica', textColor=text_dark)
+    
+    meta_style = ParagraphStyle('Meta', fontSize=9, fontName='Helvetica', textColor=text_dark, alignment=TA_RIGHT)
 
-    header_data = [[logo_circle, Paragraph(f"<b>BMI PRESCRIPTION REPORT</b>", title_style)]]
-    header_table = Table(header_data, colWidths=[0.6*inch, 6.9*inch])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 0.15*inch))
+    interpretation_style = ParagraphStyle('Interp', fontSize=10, fontName='Helvetica', textColor=text_dark, leading=14)
+    guidance_style = ParagraphStyle('Guidance', fontSize=9.5, fontName='Helvetica', textColor=text_dark, leading=14, leftIndent=0)
+    
+    footer_text_style = ParagraphStyle('FooterText', fontSize=8, fontName='Helvetica', textColor=text_muted)
+    disclaimer_style = ParagraphStyle('Disclaimer', fontSize=7.5, fontName='Helvetica', textColor=text_muted, alignment=TA_CENTER, leading=10)
 
-    # 2. Prescription Info with underline
-    info_data = [[
-        Paragraph(f"<b>Prescription ID:</b> <font color='black'>{invoice_number}</font>", label_style),
-        Paragraph(f"<b>Date:</b> <font color='black'>{invoice_date_str}</font>", label_style)
-    ]]
-    info_table = Table(info_data, colWidths=[4*inch, 3.5*inch])
-    info_table.setStyle(TableStyle([
+    # 1. Header & Branding
+    brand_content = [
+        [
+            [Paragraph("LifeTrack Health Hub", header_style), 
+             Paragraph("MEDICAL & WELLNESS REPORT", sub_header_style)],
+            Paragraph("support@lifetrack.com<br/>+91 98765 43210<br/>www.lifetrack.com", contact_style)
+        ]
+    ]
+    brand_table = Table(brand_content, colWidths=[4.2*inch, 3.0*inch])
+    brand_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBELOW', (0, 0), (-1, -1), 1.5, dark_blue),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 15),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, hospital_blue),
     ]))
-    story.append(info_table)
-    story.append(Spacer(1, 0.2*inch))
+    story.append(brand_table)
+    story.append(Spacer(1, 0.1*inch))
 
-    # 3. Patient Details
-    story.append(Table([[Paragraph("PATIENT DETAILS", section_title_style)]], colWidths=[7.5*inch], 
-                       style=[('BACKGROUND', (0,0), (-1,-1), section_bg), ('PADDING', (0,0), (-1,-1), 6)]))
+    # Report Metadata
+    meta_data = [
+        [Paragraph(f"<b>Report ID:</b> {invoice_number} | <b>Date:</b> {invoice_date_str}", meta_style)]
+    ]
+    meta_table = Table(meta_data, colWidths=[7.2*inch])
+    meta_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(meta_table)
+
+    # 2. Patient Information Section
+    story.append(Table([[Paragraph("PATIENT INFORMATION", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
     
     patient_data = [
-        [Paragraph(f"<b>Name:</b> {patient_name}", label_style)],
-        [Paragraph(f"<b>Age:</b> 46 yrs", label_style)]
+        [Paragraph("Patient Name", label_style), Paragraph(f": {patient_name}", value_style), 
+         Paragraph("Age", label_style), Paragraph(f": {age} yrs" if age else ": N/A", value_style)],
+        [Paragraph("Gender", label_style), Paragraph(f": {gender}" if gender and str(gender).strip() else ": Not Specified", value_style), 
+         Paragraph("Visit Type", label_style), Paragraph(": Wellness Assessment", value_style)]
     ]
-    patient_table = Table(patient_data, colWidths=[7.5*inch])
+    patient_table = Table(patient_data, colWidths=[1.2*inch, 2.4*inch, 1.2*inch, 2.4*inch])
     patient_table.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1, -2), 0.5, border_gray),
     ]))
     story.append(patient_table)
     story.append(Spacer(1, 0.2*inch))
 
-    # 4. Measurements
-    story.append(Table([[Paragraph("MEASUREMENTS", section_title_style)]], colWidths=[7.5*inch], 
-                       style=[('BACKGROUND', (0,0), (-1,-1), section_bg), ('PADDING', (0,0), (-1,-1), 6)]))
+    # 3. Anthropometric Measurements
+    story.append(Table([[Paragraph("ANTHROPOMETRIC MEASUREMENTS", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
     
-    meas_data = [[
-        Paragraph(f"<b>Height:</b> {height} cm", label_style),
-        Paragraph(f"<b>Weight:</b> {weight} kg", label_style)
-    ]]
-    meas_table = Table(meas_data, colWidths=[1.8*inch, 5.7*inch])
+    meas_data = [
+        [Paragraph("Height (cm)", label_style), Paragraph(f"{height} cm", value_style), 
+         Paragraph("Weight (kg)", label_style), Paragraph(f"{weight} kg", value_style)],
+        [Paragraph("BMI Reference", label_style), Paragraph("WHO Standards", value_style),
+         Paragraph("WHO Category", label_style), Paragraph(classification, value_style)]
+    ]
+    meas_table = Table(meas_data, colWidths=[1.2*inch, 2.4*inch, 1.2*inch, 2.4*inch])
     meas_table.setStyle(TableStyle([
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('GRID', (0,0), (-1,-1), 0.5, border_gray),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BACKGROUND', (0,0), (-1,-1), colors.white),
+        ('PADDING', (0,0), (-1,-1), 8),
     ]))
     story.append(meas_table)
-    story.append(Spacer(1, 0.2*inch))
+    story.append(Spacer(1, 0.25*inch))
 
-    # 5. Highlighted BMI Result Box
-    badge_table = Table([[Paragraph(category.upper(), ParagraphStyle('Badge', alignment=1, textColor=bmi_color, fontSize=12, fontName='Helvetica-Bold'))]], 
-                        colWidths=[1.8*inch], style=[
-                            ('BACKGROUND', (0,0), (-1,-1), colors.white),
-                            ('ROUNDEDCORNERS', [5, 5, 5, 5]),
-                            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                            ('PADDING', (0,0), (-1,-1), 6)
-                        ])
-
-    bmi_box_data = [[Paragraph(f"<b style='color:white;font-size:32px;'>{bmi:.1f}</b>", ParagraphStyle('BMIVal', alignment=1))],
-                    [Paragraph("<font color='white' size='11'>BMI Value</font>", ParagraphStyle('BMILabel', alignment=1))],
-                    [Spacer(1, 0.15*inch)],
-                    [badge_table]]
-    bmi_box_table = Table(bmi_box_data, colWidths=[7.5*inch])
-    bmi_box_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), bmi_color),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 20),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
-    ]))
-    story.append(bmi_box_table)
-    story.append(Spacer(1, 0.2*inch))
-
-    # 6. Assessment Charges
-    story.append(Table([[Paragraph("ASSESSMENT CHARGES", section_title_style)]], colWidths=[7.5*inch], 
-                       style=[('BACKGROUND', (0,0), (-1,-1), section_bg), ('PADDING', (0,0), (-1,-1), 6)]))
+    # 4. BMI Result Highlight
+    bmi_val_style = ParagraphStyle('BMIVal', fontSize=36, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=hospital_blue)
+    bmi_cat_style = ParagraphStyle('BMICat', fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=status_color)
     
-    charges_data = [
-        [Paragraph("Consultation & Evaluation", value_style), Paragraph("INR 500", ParagraphStyle('Right', alignment=2))],
-        [Paragraph("BMI Assessment & Analysis", value_style), Paragraph("INR 300", ParagraphStyle('Right', alignment=2))],
-        [Paragraph("Health Report", value_style), Paragraph("INR 200", ParagraphStyle('Right', alignment=2))],
-        [Paragraph("<b>TOTAL</b>", label_style), Paragraph(f"<b style='color:#e74c3c;'>INR {total_amount}</b>", ParagraphStyle('Total', alignment=2))]
+    bmi_card_content = [
+        [Paragraph(f"{bmi:.2f}", bmi_val_style)],
+        [Paragraph(category.upper(), bmi_cat_style)]
     ]
-    charges_table = Table(charges_data, colWidths=[5.5*inch, 2*inch])
-    charges_table.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -3), 0.5, colors.grey),
-        ('BACKGROUND', (0, 3), (-1, 3), total_bg),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    bmi_card = Table(bmi_card_content, colWidths=[2.5*inch])
+    bmi_card.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 1.5, hospital_blue),
+        ('BACKGROUND', (0,0), (-1,-1), light_blue),
+        ('ROUNDEDCORNERS', [15, 15, 15, 15]),
+        ('TOPPADDING', (0,0), (-1,-1), 15),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 15),
     ]))
-    story.append(charges_table)
-    story.append(Spacer(1, 0.3*inch))
+    
+    story.append(Table([[bmi_card]], colWidths=[7.2*inch], style=[('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+    story.append(Spacer(1, 0.25*inch))
 
-    # 7. Terms Box
-    terms_content = [[
-        Paragraph("<b>Terms:</b>", label_style),
-        Paragraph("Due within 30 days from assessment date.", value_style)
-    ]]
-    terms_table = Table(terms_content, colWidths=[7.5*inch])
-    terms_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), light_yellow_bg),
-        ('LINEBEFORE', (0, 0), (0, -1), 4, border_orange),
-        ('PADDING', (0, 0), (-1, -1), 12),
+    # 5. Clinical Interpretation
+    story.append(Table([[Paragraph("CLINICAL INTERPRETATION", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    
+    interp_text = f"""
+    Based on the recorded Body Mass Index (BMI) of <b>{bmi:.2f}</b>, the patient is clinically classified as <b>{category}</b>. 
+    This assessment indicates a <b>{risk_level}</b> risk level according to World Health Organization (WHO) protocols. 
+    BMI is a specialized screening tool used by healthcare professionals to evaluate body composition and related health risks.
+    """
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph(interp_text, interpretation_style))
+    story.append(Spacer(1, 0.2*inch))
+
+    # 6. Doctor's Wellness Prescription
+    story.append(Table([[Paragraph("<b style='font-size:12px;'>Rx</b> - DOCTOR'S WELLNESS PRESCRIPTION", section_title_style)]], 
+                       colWidths=[7.2*inch], style=[('BACKGROUND', (0,0), (-1,-1), hospital_blue), ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5)]))
+    
+    prescription_items = [
+        "Maintain a balanced nutritional intake focusing on whole grains, lean proteins, and micronutrients.",
+        "Ensure consistent physical activity (minimum 150 minutes of moderate aerobic exercise weekly).",
+        "Monitor hydration levels (2.5 - 3.0 Liters daily) and maintain a consistent sleep-wake cycle.",
+        "Limit intake of processed carbohydrates, saturated fats, and high-sodium dietary items.",
+        "Schedule a follow-up consultation with a clinical specialist for personalized metabolic evaluation."
+    ]
+    
+    for item in prescription_items:
+        story.append(Spacer(1, 0.05*inch))
+        story.append(Paragraph(f"&bull; {item}", guidance_style))
+    
+    story.append(Spacer(1, 0.4*inch))
+
+    # 7. Doctor Details Section (Three-Column Layout)
+    doc_label_style = ParagraphStyle('DocLabel', fontSize=9, fontName='Helvetica-Bold', textColor=text_dark)
+    doc_sub_style = ParagraphStyle('DocSub', fontSize=8, fontName='Helvetica', textColor=text_muted)
+    
+    doctors_data = [
+        [
+            [Paragraph("Dr. Sarah Thompson (MD)", doc_label_style),
+             Paragraph("Primary Consultant (Endocrinology)", doc_sub_style),
+             Paragraph("Reg No: LT-DR-001", doc_sub_style)],
+            [Paragraph("Dr. Rajesh Kumar (MS)", doc_label_style),
+             Paragraph("Clinical Nutritionist", doc_sub_style),
+             Paragraph("Reg No: LT-DR-002", doc_sub_style)],
+            [Paragraph("Dr. Anita Desai (MD)", doc_label_style),
+             Paragraph("General Medicine", doc_sub_style),
+             Paragraph("Reg No: LT-DR-003", doc_sub_style)]
+        ]
+    ]
+    
+    # Define alignments for each column
+    col_style1 = ParagraphStyle('Col1', parent=doc_label_style, alignment=TA_LEFT)
+    col_sub1 = ParagraphStyle('Sub1', parent=doc_sub_style, alignment=TA_LEFT)
+    
+    col_style2 = ParagraphStyle('Col2', parent=doc_label_style, alignment=TA_CENTER)
+    col_sub2 = ParagraphStyle('Sub2', parent=doc_sub_style, alignment=TA_CENTER)
+    
+    col_style3 = ParagraphStyle('Col3', parent=doc_label_style, alignment=TA_RIGHT)
+    col_sub3 = ParagraphStyle('Sub3', parent=doc_sub_style, alignment=TA_RIGHT)
+
+    doctors_content = [
+        [
+            [Paragraph("Dr. Sarah Thompson (MD)", col_style1),
+             Paragraph("Primary Consultant (Endocrinology)", col_sub1),
+             Paragraph("Reg No: LT-DR-001", col_sub1)],
+            [Paragraph("Dr. Rajesh Kumar (MS)", col_style2),
+             Paragraph("Clinical Nutritionist", col_sub2),
+             Paragraph("Reg No: LT-DR-002", col_sub2)],
+            [Paragraph("Dr. Anita Desai (MD)", col_style3),
+             Paragraph("General Medicine", col_sub3),
+             Paragraph("Reg No: LT-DR-003", col_sub3)]
+        ]
+    ]
+    
+    doctors_table = Table(doctors_content, colWidths=[2.3*inch, 2.6*inch, 2.3*inch])
+    doctors_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (0,0), 15),  # Shifted slightly right from left margin
+        ('RIGHTPADDING', (-1,0), (-1,0), 15), # Shifted slightly inward from right margin
     ]))
-    story.append(terms_table)
+    story.append(doctors_table)
+    story.append(Spacer(1, 0.8*inch))
+
+    # 8. Authorized Signature Section (Right-Aligned Style)
+    sig_text_style = ParagraphStyle('SigText', fontSize=10, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=text_dark)
+    sig_sub_style = ParagraphStyle('SigSub', fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=text_dark)
+    sig_verify_style = ParagraphStyle('SigVerify', fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=text_muted)
+    
+    sig_content = [
+        [Paragraph("Authorized Signature", sig_text_style)],
+        [Paragraph("LifeTrack Health Hub", sig_sub_style)],
+        [Paragraph("Medical & Wellness Report", sig_verify_style)],
+        [Paragraph("Digitally Verified Document", sig_verify_style)]
+    ]
+    
+    # Create a narrower table for the signature and align it to the right
+    sig_table = Table(sig_content, colWidths=[2.5*inch])
+    sig_table.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,0), 0.75, text_dark), # Short line ABOVE "Authorized Signature"
+        ('TOPPADDING', (0,0), (-1,0), 8),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    
+    # Wrap in a container table to right-align the whole block
+    container_table = Table([[sig_table]], colWidths=[7.2*inch])
+    container_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'RIGHT'),
+    ]))
+    story.append(container_table)
+
 
     doc.build(story)
     return pdf_path
@@ -419,7 +590,7 @@ Report includes:
 This report has been generated based on your health measurements. We recommend reviewing it and consulting with a healthcare professional if you have any concerns.
 
 Best regards,
-HealthCare Clinic & Wellness Center
+LifeTrack Health Hub
 BMI Health Tracker
         """
         
@@ -523,8 +694,9 @@ def login():
 def dashboard():
     db = get_db()
     cursor = db.cursor()
+    # Fetch records from the last 3 months
     cursor.execute(
-        'SELECT * FROM bmi_records WHERE patient_id = ? ORDER BY date DESC LIMIT 10',
+        "SELECT * FROM bmi_records WHERE patient_id = ? AND date >= date('now', '-3 months') ORDER BY date DESC",
         (session['user_id'],)
     )
     records = cursor.fetchall()
@@ -543,7 +715,8 @@ def bmi_calculator():
             height_cm = float(data.get('height', 0))
             weight_kg = float(data.get('weight', 0))
             age = data.get('age')
-            print(f"DEBUG: height={height_cm}, weight={weight_kg}, age={age}, age_type={type(age)}")
+            gender = data.get('gender')
+            print(f"DEBUG: height={height_cm}, weight={weight_kg}, age={age}, gender={gender}")
             
             if height_cm <= 0 or weight_kg <= 0:
                 return jsonify({'success': False, 'errors': ['Height and weight must be positive values']}), 400
@@ -566,8 +739,8 @@ def bmi_calculator():
             db = get_db()
             cursor = db.cursor()
             cursor.execute(
-                'INSERT INTO bmi_records (patient_id, age, height, weight, bmi, category) VALUES (?, ?, ?, ?, ?, ?)',
-                (session['user_id'], age_int, height_cm, weight_kg, bmi, category)
+                'INSERT INTO bmi_records (patient_id, age, gender, height, weight, bmi, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (session['user_id'], age_int, gender, height_cm, weight_kg, bmi, category)
             )
             db.commit()
             record_id = cursor.lastrowid
@@ -581,7 +754,8 @@ def bmi_calculator():
                 weight_kg,
                 bmi,
                 category,
-                date_str
+                date_str,
+                gender=gender
             )
             
             result_data = {
@@ -649,7 +823,8 @@ def send_email_route(record_id):
         record['weight'],
         record['bmi'],
         record['category'],
-        record['date']
+        record['date'],
+        gender=record['gender']
     )
     
     user_email = session.get('user_email')
@@ -715,7 +890,9 @@ def create_invoice(record_id):
             health_report_fee,
             total_amount,
             payment_terms,
-            invoice_date
+            invoice_date,
+            age=record['age'],
+            gender=record['gender']
         )
         
         return jsonify({
@@ -746,7 +923,7 @@ def send_invoice(invoice_id):
     cursor = db.cursor()
     
     cursor.execute(
-        'SELECT i.*, b.height, b.weight, b.bmi, b.category FROM invoices i '
+        'SELECT i.*, b.age, b.gender, b.height, b.weight, b.bmi, b.category FROM invoices i '
         'JOIN bmi_records b ON i.record_id = b.id '
         'WHERE i.id = ? AND i.patient_id = ?',
         (invoice_id, session['user_id'])
@@ -770,7 +947,9 @@ def send_invoice(invoice_id):
         invoice['health_report_fee'],
         invoice['total_amount'],
         invoice['payment_terms'],
-        invoice['invoice_date']
+        invoice['invoice_date'],
+        age=invoice['age'],
+        gender=invoice['gender']
     )
     
     user_email = session.get('user_email')
@@ -793,7 +972,7 @@ def download_invoice(invoice_id):
     cursor = db.cursor()
     
     cursor.execute(
-        'SELECT i.*, b.height, b.weight, b.bmi, b.category FROM invoices i '
+        'SELECT i.*, b.age, b.gender, b.height, b.weight, b.bmi, b.category FROM invoices i '
         'JOIN bmi_records b ON i.record_id = b.id '
         'WHERE i.id = ? AND i.patient_id = ?',
         (invoice_id, session['user_id'])
@@ -817,7 +996,9 @@ def download_invoice(invoice_id):
         invoice['health_report_fee'],
         invoice['total_amount'],
         invoice['payment_terms'],
-        invoice['invoice_date']
+        invoice['invoice_date'],
+        age=invoice['age'],
+        gender=invoice['gender']
     )
     
     return send_file(invoice_path, as_attachment=True, download_name=f"Invoice_{invoice['invoice_number']}.pdf")
@@ -836,7 +1017,7 @@ def send_invoice_formsubmit():
     cursor = db.cursor()
     
     cursor.execute(
-        'SELECT i.*, b.age, b.height, b.weight, b.bmi, b.category FROM invoices i '
+        'SELECT i.*, b.age, b.gender, b.height, b.weight, b.bmi, b.category FROM invoices i '
         'JOIN bmi_records b ON i.record_id = b.id '
         'WHERE i.id = ? AND i.patient_id = ?',
         (invoice_id, session['user_id'])
@@ -860,6 +1041,7 @@ def send_invoice_formsubmit():
                 '3_Date_and_Time': invoice['invoice_date'],
                 '4_Patient_Details_Name': session['user_name'],
                 '5_Patient_Age': f"{invoice['age']} years" if invoice['age'] else 'Not provided',
+                '5a_Patient_Gender': invoice['gender'] if invoice['gender'] else 'Not specified',
                 '6_Height_cm': str(invoice['height']),
                 '7_Weight_kg': str(invoice['weight']),
                 '8_BMI_Value': f"{invoice['bmi']:.2f}",
